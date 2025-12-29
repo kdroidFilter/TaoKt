@@ -1,0 +1,14 @@
+[package]
+name = "taokt"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+image = { version = "0.25.8", default-features = false, features = ["png", "ico"] }
+tao = { git = "https://github.com/tauri-apps/tao", branch = "dev" }
+thiserror = "2.0.11"
+uniffi = "0.29.4"
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/main/rust/lib.rs"

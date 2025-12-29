@@ -1,0 +1,438 @@
+use std::sync::{Arc, Mutex};
+
+use crate::{
+    CursorIcon, Icon, LogicalSize, Monitor, PhysicalPositionF64, PhysicalPositionI32, PhysicalSizeU32, ProgressBarState,
+    TaoError, Theme, VideoMode, WindowSizeConstraints,
+};
+
+#[derive(Clone, uniffi::Enum)]
+pub enum Fullscreen {
+    Borderless { monitor: Option<Arc<Monitor>> },
+    Exclusive { video_mode: Arc<VideoMode> },
+}
+
+impl Fullscreen {
+    pub(crate) fn to_tao(&self) -> tao::window::Fullscreen {
+        match self {
+            Fullscreen::Borderless { monitor } => tao::window::Fullscreen::Borderless(
+                monitor.as_ref().map(|m| m.inner.clone()),
+            ),
+            Fullscreen::Exclusive { video_mode } => {
+                tao::window::Fullscreen::Exclusive(video_mode.inner.clone())
+            }
+        }
+    }
+}
+
+fn fullscreen_from_tao(fullscreen: tao::window::Fullscreen) -> Fullscreen {
+    match fullscreen {
+        tao::window::Fullscreen::Borderless(monitor) => Fullscreen::Borderless {
+            monitor: monitor.map(|m| Arc::new(Monitor { inner: m })),
+        },
+        tao::window::Fullscreen::Exclusive(video_mode) => Fullscreen::Exclusive {
+            video_mode: Arc::new(VideoMode { inner: video_mode }),
+        },
+        _ => Fullscreen::Borderless { monitor: None },
+    }
+}
+
+#[derive(uniffi::Object)]
+pub struct WindowBuilder {
+    pub(crate) inner: Mutex<tao::window::WindowBuilder>,
+}
+
+#[uniffi::export]
+impl WindowBuilder {
+    #[uniffi::constructor]
+    pub fn new() -> Self {
+        Self {
+            inner: Mutex::new(tao::window::WindowBuilder::new()),
+        }
+    }
+
+    pub fn set_title(&self, title: String) {
+        let mut inner = self.inner.lock().unwrap();
+        *inner = inner.clone().with_title(title);
+    }
+
+    pub fn set_inner_size(&self, size: LogicalSize) {
+        let mut inner = self.inner.lock().unwrap();
+        let size: tao::dpi::Size = tao::dpi::LogicalSize::new(size.width, size.height).into();
+        *inner = inner.clone().with_inner_size(size);
+    }
+
+    pub fn set_min_inner_size(&self, size: LogicalSize) {
+        let mut inner = self.inner.lock().unwrap();
+        let size: tao::dpi::Size = tao::dpi::LogicalSize::new(size.width, size.height).into();
+        *inner = inner.clone().with_min_inner_size(size);
+    }
+
+    pub fn set_decorations(&self, decorations: bool) {
+        let mut inner = self.inner.lock().unwrap();
+        *inner = inner.clone().with_decorations(decorations);
+    }
+
+    pub fn set_resizable(&self, resizable: bool) {
+        let mut inner = self.inner.lock().unwrap();
+        *inner = inner.clone().with_resizable(resizable);
+    }
+
+    pub fn set_transparent(&self, transparent: bool) {
+        let mut inner = self.inner.lock().unwrap();
+        *inner = inner.clone().with_transparent(transparent);
+    }
+
+    pub fn set_fullscreen(&self, fullscreen: Option<Fullscreen>) {
+        let mut inner = self.inner.lock().unwrap();
+        *inner = inner
+            .clone()
+            .with_fullscreen(fullscreen.as_ref().map(|f| f.to_tao()));
+    }
+
+    pub fn set_window_icon(&self, icon: Option<Arc<Icon>>) {
+        let mut inner = self.inner.lock().unwrap();
+        *inner = inner
+            .clone()
+            .with_window_icon(icon.as_ref().map(|i| i.inner.clone()));
+    }
+
+    pub fn set_theme(&self, theme: Option<Theme>) {
+        let mut inner = self.inner.lock().unwrap();
+        *inner = inner
+            .clone()
+            .with_theme(theme.map(|t| tao::window::Theme::from(t)));
+    }
+
+    pub fn set_parent_window(&self, parent: Arc<Window>) -> Result<(), TaoError> {
+        let parent_window = parent.inner.lock().unwrap();
+
+        #[cfg(target_os = "macos")]
+        {
+            use tao::platform::macos::{WindowBuilderExtMacOS, WindowExtMacOS};
+            let mut inner = self.inner.lock().unwrap();
+            let ns_window = parent_window.ns_window();
+            *inner = inner.clone().with_parent_window(ns_window);
+            return Ok(());
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            use tao::platform::windows::{WindowBuilderExtWindows, WindowExtWindows};
+            let mut inner = self.inner.lock().unwrap();
+            let hwnd = parent_window.hwnd();
+            *inner = inner.clone().with_parent_window(hwnd);
+            return Ok(());
+        }
+
+        #[cfg(any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        ))]
+        {
+            use tao::platform::unix::{WindowBuilderExtUnix, WindowExtUnix};
+            let mut inner = self.inner.lock().unwrap();
+            let gtk_window = parent_window.gtk_window();
+            *inner = inner.clone().with_transient_for(gtk_window);
+            return Ok(());
+        }
+
+        #[allow(unreachable_code)]
+        Err(TaoError::Unsupported)
+    }
+}
+
+#[derive(uniffi::Object)]
+pub struct Window {
+    pub(crate) id: u64,
+    pub(crate) inner: Mutex<tao::window::Window>,
+}
+
+#[uniffi::export]
+impl Window {
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+
+    pub fn request_redraw(&self) {
+        let window = self.inner.lock().unwrap();
+        window.request_redraw();
+    }
+
+    pub fn set_title(&self, title: String) {
+        let window = self.inner.lock().unwrap();
+        window.set_title(&title);
+    }
+
+    pub fn set_cursor_icon(&self, icon: CursorIcon) {
+        let window = self.inner.lock().unwrap();
+        window.set_cursor_icon(icon.into());
+    }
+
+    pub fn set_cursor_grab(&self, grab: bool) -> Result<(), TaoError> {
+        let window = self.inner.lock().unwrap();
+        window.set_cursor_grab(grab)?;
+        Ok(())
+    }
+
+    pub fn set_cursor_visible(&self, visible: bool) {
+        let window = self.inner.lock().unwrap();
+        window.set_cursor_visible(visible);
+    }
+
+    pub fn set_decorations(&self, decorations: bool) {
+        let window = self.inner.lock().unwrap();
+        window.set_decorations(decorations);
+    }
+
+    pub fn set_resizable(&self, resizable: bool) {
+        let window = self.inner.lock().unwrap();
+        window.set_resizable(resizable);
+    }
+
+    pub fn set_minimized(&self, minimized: bool) {
+        let window = self.inner.lock().unwrap();
+        window.set_minimized(minimized);
+    }
+
+    pub fn is_minimized(&self) -> bool {
+        let window = self.inner.lock().unwrap();
+        window.is_minimized()
+    }
+
+    pub fn set_focus(&self) {
+        let window = self.inner.lock().unwrap();
+        window.set_focus();
+    }
+
+    pub fn set_visible(&self, visible: bool) {
+        let window = self.inner.lock().unwrap();
+        window.set_visible(visible);
+    }
+
+    pub fn set_always_on_top(&self, always_on_top: bool) {
+        let window = self.inner.lock().unwrap();
+        window.set_always_on_top(always_on_top);
+    }
+
+    pub fn set_always_on_bottom(&self, always_on_bottom: bool) {
+        let window = self.inner.lock().unwrap();
+        window.set_always_on_bottom(always_on_bottom);
+    }
+
+    pub fn set_content_protection(&self, enabled: bool) {
+        let window = self.inner.lock().unwrap();
+        window.set_content_protection(enabled);
+    }
+
+    pub fn is_minimizable(&self) -> bool {
+        let window = self.inner.lock().unwrap();
+        window.is_minimizable()
+    }
+
+    pub fn set_minimizable(&self, minimizable: bool) {
+        let window = self.inner.lock().unwrap();
+        window.set_minimizable(minimizable);
+    }
+
+    pub fn is_maximizable(&self) -> bool {
+        let window = self.inner.lock().unwrap();
+        window.is_maximizable()
+    }
+
+    pub fn set_maximizable(&self, maximizable: bool) {
+        let window = self.inner.lock().unwrap();
+        window.set_maximizable(maximizable);
+    }
+
+    pub fn is_closable(&self) -> bool {
+        let window = self.inner.lock().unwrap();
+        window.is_closable()
+    }
+
+    pub fn set_closable(&self, closable: bool) {
+        let window = self.inner.lock().unwrap();
+        window.set_closable(closable);
+    }
+
+    pub fn is_maximized(&self) -> bool {
+        let window = self.inner.lock().unwrap();
+        window.is_maximized()
+    }
+
+    pub fn set_maximized(&self, maximized: bool) {
+        let window = self.inner.lock().unwrap();
+        window.set_maximized(maximized);
+    }
+
+    pub fn inner_size(&self) -> PhysicalSizeU32 {
+        let window = self.inner.lock().unwrap();
+        window.inner_size().into()
+    }
+
+    pub fn outer_size(&self) -> PhysicalSizeU32 {
+        let window = self.inner.lock().unwrap();
+        window.outer_size().into()
+    }
+
+    pub fn outer_position(&self) -> Result<PhysicalPositionI32, TaoError> {
+        let window = self.inner.lock().unwrap();
+        Ok(window.outer_position()?.into())
+    }
+
+    pub fn inner_position(&self) -> Result<PhysicalPositionI32, TaoError> {
+        let window = self.inner.lock().unwrap();
+        Ok(window.inner_position()?.into())
+    }
+
+    pub fn set_outer_position(&self, position: PhysicalPositionI32) {
+        let window = self.inner.lock().unwrap();
+        let position: tao::dpi::Position =
+            tao::dpi::PhysicalPosition::new(position.x, position.y).into();
+        window.set_outer_position(position);
+    }
+
+    pub fn set_inner_size(&self, size: PhysicalSizeU32) {
+        let window = self.inner.lock().unwrap();
+        let size: tao::dpi::Size = tao::dpi::PhysicalSize::new(size.width, size.height).into();
+        window.set_inner_size(size);
+    }
+
+    pub fn set_min_inner_size(&self, size: Option<PhysicalSizeU32>) {
+        let window = self.inner.lock().unwrap();
+        let size = size.map(|s| tao::dpi::Size::from(tao::dpi::PhysicalSize::new(s.width, s.height)));
+        window.set_min_inner_size(size);
+    }
+
+    pub fn set_max_inner_size(&self, size: Option<PhysicalSizeU32>) {
+        let window = self.inner.lock().unwrap();
+        let size = size.map(|s| tao::dpi::Size::from(tao::dpi::PhysicalSize::new(s.width, s.height)));
+        window.set_max_inner_size(size);
+    }
+
+    pub fn set_cursor_position(&self, position: PhysicalPositionI32) -> Result<(), TaoError> {
+        let window = self.inner.lock().unwrap();
+        let position: tao::dpi::Position =
+            tao::dpi::PhysicalPosition::new(position.x, position.y).into();
+        window.set_cursor_position(position)?;
+        Ok(())
+    }
+
+    pub fn set_ime_position(&self, position: PhysicalPositionF64) {
+        let window = self.inner.lock().unwrap();
+        let position: tao::dpi::Position =
+            tao::dpi::PhysicalPosition::new(position.x, position.y).into();
+        window.set_ime_position(position);
+    }
+
+    pub fn drag_window(&self) -> Result<(), TaoError> {
+        let window = self.inner.lock().unwrap();
+        window.drag_window()?;
+        Ok(())
+    }
+
+    pub fn fullscreen(&self) -> Option<Fullscreen> {
+        let window = self.inner.lock().unwrap();
+        window.fullscreen().map(fullscreen_from_tao)
+    }
+
+    pub fn set_fullscreen(&self, fullscreen: Option<Fullscreen>) {
+        let window = self.inner.lock().unwrap();
+        window.set_fullscreen(fullscreen.as_ref().map(|f| f.to_tao()));
+    }
+
+    pub fn set_window_icon(&self, icon: Option<Arc<Icon>>) {
+        let window = self.inner.lock().unwrap();
+        window.set_window_icon(icon.as_ref().map(|i| i.inner.clone()));
+    }
+
+    pub fn current_monitor(&self) -> Option<Arc<Monitor>> {
+        let window = self.inner.lock().unwrap();
+        window.current_monitor().map(|m| Arc::new(Monitor { inner: m }))
+    }
+
+    pub fn primary_monitor(&self) -> Option<Arc<Monitor>> {
+        let window = self.inner.lock().unwrap();
+        window.primary_monitor().map(|m| Arc::new(Monitor { inner: m }))
+    }
+
+    pub fn available_monitors(&self) -> Vec<Arc<Monitor>> {
+        let window = self.inner.lock().unwrap();
+        window
+            .available_monitors()
+            .map(|m| Arc::new(Monitor { inner: m }))
+            .collect()
+    }
+
+    pub fn set_progress_bar(&self, state: ProgressBarState) {
+        let window = self.inner.lock().unwrap();
+        window.set_progress_bar(state.into());
+    }
+
+    pub fn set_inner_size_constraints(&self, constraints: WindowSizeConstraints) {
+        let window = self.inner.lock().unwrap();
+        window.set_inner_size_constraints(constraints.into());
+    }
+
+    pub fn theme(&self) -> Theme {
+        let window = self.inner.lock().unwrap();
+        window.theme().into()
+    }
+
+    pub fn set_theme(&self, theme: Option<Theme>) {
+        let window = self.inner.lock().unwrap();
+        window.set_theme(theme.map(|t| t.into()));
+    }
+
+    pub fn set_overlay_icon(&self, icon: Option<Arc<Icon>>) {
+        #[cfg(windows)]
+        {
+            use tao::platform::windows::WindowExtWindows;
+            let window = self.inner.lock().unwrap();
+            window.set_overlay_icon(icon.as_ref().map(|i| &i.inner));
+        }
+
+        #[cfg(not(windows))]
+        let _ = icon;
+    }
+
+    pub fn set_badge_count(&self, count: Option<i64>) {
+        #[cfg(any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        ))]
+        {
+            use tao::platform::unix::WindowExtUnix;
+            let window = self.inner.lock().unwrap();
+            window.set_badge_count(count, None);
+        }
+
+        #[cfg(target_os = "ios")]
+        {
+            use tao::platform::ios::WindowExtIOS;
+            let window = self.inner.lock().unwrap();
+            window.set_badge_count(count.unwrap_or(0) as usize);
+        }
+    }
+
+    pub fn set_badge_label(&self, label: Option<String>) {
+        #[cfg(target_os = "macos")]
+        {
+            use tao::platform::macos::WindowExtMacOS;
+            let window = self.inner.lock().unwrap();
+            window.set_badge_label(label);
+        }
+
+        #[cfg(not(target_os = "macos"))]
+        let _ = label;
+    }
+
+    pub fn debug_string(&self) -> String {
+        format!("Window(id={})", self.id)
+    }
+}
