@@ -1,3 +1,4 @@
+import org.gradle.internal.os.OperatingSystem
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -16,6 +17,9 @@ dependencies {
 
 application {
     mainClass.set("io.github.kdroidfilter.taokt.examples.MainKt")
+    if (OperatingSystem.current().isMacOsX) {
+        applicationDefaultJvmArgs = listOf("-XstartOnFirstThread")
+    }
 }
 
 kotlin {

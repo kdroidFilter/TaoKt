@@ -5,6 +5,13 @@ use crate::{
     TaoError, Theme, VideoMode, WindowSizeConstraints,
 };
 
+#[derive(Clone)]
+struct SendableWindowBuilder(tao::window::WindowBuilder);
+
+// Safety: the builder only stores configuration data and raw handles; it is only
+// used to build windows on the event-loop thread.
+unsafe impl Send for SendableWindowBuilder {}
+
 #[derive(Clone, uniffi::Enum)]
 pub enum Fullscreen {
     Borderless { monitor: Option<Arc<Monitor>> },
@@ -18,7 +25,8 @@ impl Fullscreen {
                 monitor.as_ref().map(|m| m.inner.clone()),
             ),
             Fullscreen::Exclusive { video_mode } => {
-                tao::window::Fullscreen::Exclusive(video_mode.inner.clone())
+                let inner = video_mode.inner.lock().unwrap();
+                tao::window::Fullscreen::Exclusive(inner.clone())
             }
         }
     }
@@ -30,7 +38,9 @@ fn fullscreen_from_tao(fullscreen: tao::window::Fullscreen) -> Fullscreen {
             monitor: monitor.map(|m| Arc::new(Monitor { inner: m })),
         },
         tao::window::Fullscreen::Exclusive(video_mode) => Fullscreen::Exclusive {
-            video_mode: Arc::new(VideoMode { inner: video_mode }),
+            video_mode: Arc::new(VideoMode {
+                inner: Mutex::new(video_mode),
+            }),
         },
         _ => Fullscreen::Borderless { monitor: None },
     }
@@ -38,7 +48,7 @@ fn fullscreen_from_tao(fullscreen: tao::window::Fullscreen) -> Fullscreen {
 
 #[derive(uniffi::Object)]
 pub struct WindowBuilder {
-    pub(crate) inner: Mutex<tao::window::WindowBuilder>,
+    inner: Mutex<SendableWindowBuilder>,
 }
 
 #[uniffi::export]
@@ -46,59 +56,62 @@ impl WindowBuilder {
     #[uniffi::constructor]
     pub fn new() -> Self {
         Self {
-            inner: Mutex::new(tao::window::WindowBuilder::new()),
+            inner: Mutex::new(SendableWindowBuilder(tao::window::WindowBuilder::new())),
         }
     }
 
     pub fn set_title(&self, title: String) {
         let mut inner = self.inner.lock().unwrap();
-        *inner = inner.clone().with_title(title);
+        inner.0 = inner.0.clone().with_title(title);
     }
 
     pub fn set_inner_size(&self, size: LogicalSize) {
         let mut inner = self.inner.lock().unwrap();
         let size: tao::dpi::Size = tao::dpi::LogicalSize::new(size.width, size.height).into();
-        *inner = inner.clone().with_inner_size(size);
+        inner.0 = inner.0.clone().with_inner_size(size);
     }
 
     pub fn set_min_inner_size(&self, size: LogicalSize) {
         let mut inner = self.inner.lock().unwrap();
         let size: tao::dpi::Size = tao::dpi::LogicalSize::new(size.width, size.height).into();
-        *inner = inner.clone().with_min_inner_size(size);
+        inner.0 = inner.0.clone().with_min_inner_size(size);
     }
 
     pub fn set_decorations(&self, decorations: bool) {
         let mut inner = self.inner.lock().unwrap();
-        *inner = inner.clone().with_decorations(decorations);
+        inner.0 = inner.0.clone().with_decorations(decorations);
     }
 
     pub fn set_resizable(&self, resizable: bool) {
         let mut inner = self.inner.lock().unwrap();
-        *inner = inner.clone().with_resizable(resizable);
+        inner.0 = inner.0.clone().with_resizable(resizable);
     }
 
     pub fn set_transparent(&self, transparent: bool) {
         let mut inner = self.inner.lock().unwrap();
-        *inner = inner.clone().with_transparent(transparent);
+        inner.0 = inner.0.clone().with_transparent(transparent);
     }
 
     pub fn set_fullscreen(&self, fullscreen: Option<Fullscreen>) {
         let mut inner = self.inner.lock().unwrap();
-        *inner = inner
+        inner.0 = inner
+            .0
             .clone()
             .with_fullscreen(fullscreen.as_ref().map(|f| f.to_tao()));
     }
 
     pub fn set_window_icon(&self, icon: Option<Arc<Icon>>) {
         let mut inner = self.inner.lock().unwrap();
-        *inner = inner
+        inner.0 = inner
+            .0
             .clone()
             .with_window_icon(icon.as_ref().map(|i| i.inner.clone()));
     }
 
     pub fn set_theme(&self, theme: Option<Theme>) {
         let mut inner = self.inner.lock().unwrap();
-        *inner = inner
+        inner.0 = inner
+            .0
             .clone()
             .with_theme(theme.map(|t| tao::window::Theme::from(t)));
     }
@@ -111,7 +124,7 @@ impl WindowBuilder {
             use tao::platform::macos::{WindowBuilderExtMacOS, WindowExtMacOS};
             let mut inner = self.inner.lock().unwrap();
             let ns_window = parent_window.ns_window();
-            *inner = inner.clone().with_parent_window(ns_window);
+            inner.0 = inner.0.clone().with_parent_window(ns_window);
             return Ok(());
         }
 
@@ -120,7 +133,7 @@ impl WindowBuilder {
             use tao::platform::windows::{WindowBuilderExtWindows, WindowExtWindows};
             let mut inner = self.inner.lock().unwrap();
             let hwnd = parent_window.hwnd();
-            *inner = inner.clone().with_parent_window(hwnd);
+            inner.0 = inner.0.clone().with_parent_window(hwnd);
             return Ok(());
         }
 
@@ -135,12 +148,18 @@ impl WindowBuilder {
             use tao::platform::unix::{WindowBuilderExtUnix, WindowExtUnix};
             let mut inner = self.inner.lock().unwrap();
             let gtk_window = parent_window.gtk_window();
-            *inner = inner.clone().with_transient_for(gtk_window);
+            inner.0 = inner.0.clone().with_transient_for(gtk_window);
             return Ok(());
         }
 
         #[allow(unreachable_code)]
         Err(TaoError::Unsupported)
+    }
+}
+
+impl WindowBuilder {
+    pub(crate) fn clone_inner(&self) -> tao::window::WindowBuilder {
+        self.inner.lock().unwrap().0.clone()
     }
 }
 

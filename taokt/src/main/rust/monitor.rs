@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::{PhysicalPositionI32, PhysicalSizeU32};
 
@@ -28,7 +28,7 @@ impl Monitor {
     pub fn video_modes(&self) -> Vec<Arc<VideoMode>> {
         self.inner
             .video_modes()
-            .map(|vm| Arc::new(VideoMode { inner: vm }))
+            .map(|vm| Arc::new(VideoMode { inner: Mutex::new(vm) }))
             .collect()
     }
 
@@ -39,35 +39,40 @@ impl Monitor {
 
 #[derive(uniffi::Object)]
 pub struct VideoMode {
-    pub(crate) inner: tao::monitor::VideoMode,
+    pub(crate) inner: Mutex<tao::monitor::VideoMode>,
 }
 
 #[uniffi::export]
 impl VideoMode {
     pub fn size(&self) -> PhysicalSizeU32 {
-        self.inner.size().into()
+        let inner = self.inner.lock().unwrap();
+        inner.size().into()
     }
 
     pub fn bit_depth(&self) -> u16 {
-        self.inner.bit_depth()
+        let inner = self.inner.lock().unwrap();
+        inner.bit_depth()
     }
 
     pub fn refresh_rate(&self) -> u16 {
-        self.inner.refresh_rate()
+        let inner = self.inner.lock().unwrap();
+        inner.refresh_rate()
     }
 
     pub fn monitor(&self) -> Arc<Monitor> {
+        let inner = self.inner.lock().unwrap();
         Arc::new(Monitor {
-            inner: self.inner.monitor(),
+            inner: inner.monitor(),
         })
     }
 
     pub fn display_string(&self) -> String {
-        format!("{}", self.inner)
+        let inner = self.inner.lock().unwrap();
+        format!("{}", inner)
     }
 
     pub fn debug_string(&self) -> String {
-        format!("{:?}", self.inner)
+        let inner = self.inner.lock().unwrap();
+        format!("{:?}", inner)
     }
 }
-

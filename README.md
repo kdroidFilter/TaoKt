@@ -13,7 +13,7 @@ This repo also contains a Kotlin/JVM binding for `tauri-apps/tao` using Gobley (
 
 ```shell
 ./gradlew :taokt-bindings:build
-```
+```pil
 
 ### Run examples
 

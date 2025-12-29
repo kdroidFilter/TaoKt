@@ -113,7 +113,7 @@ impl App {
 
     pub fn create_window(&self, builder: Arc<WindowBuilder>) -> Result<Arc<Window>, TaoError> {
         self.with_target(|target| {
-            let tao_builder = builder.inner.lock().unwrap().clone();
+            let tao_builder = builder.clone_inner();
             tao_builder.build(target).map_err(TaoError::from)
         })?
         .map(|tao_window| {
