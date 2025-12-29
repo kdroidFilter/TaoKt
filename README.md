@@ -8,17 +8,26 @@ This repo also contains a Kotlin/JVM binding for `tauri-apps/tao` using Gobley (
 
 - `:taokt-bindings` (dir `taokt/`): Rust `cdylib` + generated UniFFI Kotlin bindings.
 - `:taokt-examples` (dir `taokt-examples/`): Kotlin ports of the `tao` examples.
+- `:taokt-examples-native` (dir `taokt-examples-native/`): Kotlin/Native ports of the `tao` examples.
 
 ### Build bindings
 
 ```shell
 ./gradlew :taokt-bindings:build
-```pil
+```
 
 ### Run examples
 
 ```shell
 ./gradlew :taokt-examples:run --args="<example>"
+```
+
+### Run examples (Kotlin/Native)
+
+Build/run the host executable (example for Linux x64):
+
+```shell
+./gradlew :taokt-examples-native:runDebugExecutableLinuxX64 --args="window"
 ```
 
 List available examples:
@@ -31,6 +40,9 @@ Notes:
 
 - Icon examples use `third_party/tao/examples/icon.png` and `third_party/tao/examples/icon.ico`.
 - On Linux/Windows, the bindings enable `EventLoopBuilderExt*::with_any_thread(true)` so the event loop can be created from the JVM thread.
+- Kotlin/Native builds only the host target by default; set `-Ptaokt.enableAllNativeTargets=true` to keep non-host native tasks enabled.
+- On Linux (Kotlin/Native), you need GTK3 dev libraries (for example on Debian/Ubuntu: `sudo apt-get install libgtk-3-dev`).
+- Kotlin/Native on Windows supports x64 only (`mingwX64`).
 
 * [/composeApp](./composeApp/src) is for code that will be shared across your Compose Multiplatform applications.
   It contains several subfolders:

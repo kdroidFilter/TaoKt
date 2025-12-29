@@ -35,5 +35,6 @@ plugins {
 include(":composeApp")
 include(":taokt-bindings")
 include(":taokt-examples")
+include(":taokt-examples-native")
 
 project(":taokt-bindings").projectDir = file("taokt")

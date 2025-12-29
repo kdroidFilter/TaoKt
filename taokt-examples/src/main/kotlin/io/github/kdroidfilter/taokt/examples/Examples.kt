@@ -1,12 +1,11 @@
 package io.github.kdroidfilter.taokt.examples
 
 import io.github.kdroidfilter.taokt.tao.*
+import java.util.concurrent.LinkedBlockingQueue
+import kotlin.concurrent.thread
 import io.github.kdroidfilter.taokt.tao.run as taoRun
 import io.github.kdroidfilter.taokt.tao.runReturnLoop as taoRunReturnLoop
-import io.github.kdroidfilter.taokt.tao.runReturnLoopWithConfig as taoRunReturnLoopWithConfig
 import io.github.kdroidfilter.taokt.tao.runWithConfig as taoRunWithConfig
-import kotlin.concurrent.thread
-import java.util.concurrent.LinkedBlockingQueue
 
 object Examples {
     private enum class ControlFlowMode { WAIT, WAIT_UNTIL, POLL }
@@ -59,24 +58,24 @@ object Examples {
 
     private fun promptInt(prompt: String): Int? {
         print(prompt)
-        val line = readLine()?.trim().orEmpty()
+        val line = readlnOrNull()?.trim().orEmpty()
         if (line.isBlank()) return null
         return line.toIntOrNull()
     }
 
     private fun <T> List<T>.getOrNullIndex(index: Int): T? =
-        if (index < 0 || index >= size) null else this[index]
+        if (index !in 0..<size) null else this[index]
 
     private class MultithreadedWorker(
         private val window: Window,
         private val baseWidth: UInt,
         private val baseHeight: UInt,
     ) {
-        private val queue = LinkedBlockingQueue<TaoWindowEvent?>()
+        private val queue = LinkedBlockingQueue<TaoWindowEvent>()
         @Volatile private var running = true
         private lateinit var thread: Thread
 
-        private var modifiers = ModifiersState(false, false, false, false)
+        private var modifiers = ModifiersState(false, control = false, alt = false, superKey = false)
         private var videoModes: List<VideoMode> = emptyList()
         private var videoModeId: Int = 0
 
@@ -101,7 +100,7 @@ object Examples {
         }
 
         private fun <T> List<T>.getOrNullIndex(index: Int): T? =
-            if (index < 0 || index >= size) null else this[index]
+            if (index !in 0..<size) null else this[index]
 
         private fun handle(event: TaoWindowEvent) {
             when (event) {
@@ -190,7 +189,6 @@ object Examples {
                             videoModeId = when (key) {
                                 Key.ArrowLeft -> (videoModeId - 1).coerceAtLeast(0)
                                 Key.ArrowRight -> (videoModeId + 1).coerceAtMost(videoModes.lastIndex)
-                                else -> videoModeId
                             }
                             println("Picking video mode: ${videoModes[videoModeId].displayString()}")
                         }
@@ -366,7 +364,7 @@ object Examples {
         taoRun(
             object : TaoEventHandler {
                 private var window: Window? = null
-                private var modifiers = ModifiersState(false, false, false, false)
+                private var modifiers = ModifiersState(shift = false, control = false, alt = false, superKey = false)
 
                 override fun handleEvent(event: TaoEvent, app: App): ControlFlow {
                     when (event) {
@@ -698,11 +696,6 @@ object Examples {
     }
 
     private fun minMaxSize() {
-        val minWidth = 400.0
-        val maxWidth = 800.0
-        val minHeight = 200.0
-        val maxHeight = 400.0
-
         println("constraint keys:")
         println("  (E) Toggle the min width")
         println("  (F) Toggle the max width")
@@ -727,10 +720,10 @@ object Examples {
                                 if (keyEvent.state == ElementState.RELEASED) {
                                     when (val k = keyEvent.logicalKey) {
                                         is Key.Character -> when (k.value) {
-                                            "e" -> constraints = constraints.copy(minWidth = constraints.minWidth?.let { null } ?: minWidth)
-                                            "f" -> constraints = constraints.copy(maxWidth = constraints.maxWidth?.let { null } ?: maxWidth)
-                                            "p" -> constraints = constraints.copy(minHeight = constraints.minHeight?.let { null } ?: minHeight)
-                                            "v" -> constraints = constraints.copy(maxHeight = constraints.maxHeight?.let { null } ?: maxHeight)
+                                            "e" -> constraints = constraints.copy(minWidth = null)
+                                            "f" -> constraints = constraints.copy(maxWidth = null)
+                                            "p" -> constraints = constraints.copy(minHeight = null)
+                                            "v" -> constraints = constraints.copy(maxHeight = null)
                                         }
 
                                         else -> {}
@@ -944,17 +937,14 @@ object Examples {
                                             we.event.state == ElementState.RELEASED && we.event.logicalKey == Key.Escape
                                         }
 
-                                        else -> false
                                     }
 
                                     if (shouldClose) {
                                         workers.remove(event.windowId)?.stop()
-                                    } else if (worker != null) {
-                                        worker.send(we)
-                                    }
+                                    } else worker?.send(we)
                                 }
 
-                                else -> if (worker != null) worker.send(we)
+                                else -> worker?.send(we)
                             }
                         }
 
@@ -971,7 +961,7 @@ object Examples {
         taoRun(
             object : TaoEventHandler {
                 private var window: Window? = null
-                private var modifiers = ModifiersState(false, false, false, false)
+                private var modifiers = ModifiersState(shift = false, control = false, alt = false, superKey = false)
 
                 override fun handleEvent(event: TaoEvent, app: App): ControlFlow {
                     when (event) {
@@ -1083,7 +1073,7 @@ object Examples {
         taoRun(
             object : TaoEventHandler {
                 private var window: Window? = null
-                private var modifiers = ModifiersState(false, false, false, false)
+                private var modifiers = ModifiersState(shift = false, control = false, alt = false, superKey = false)
 
                 override fun handleEvent(event: TaoEvent, app: App): ControlFlow {
                     when (event) {
