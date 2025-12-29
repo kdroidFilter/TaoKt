@@ -16,4 +16,3 @@ fun main(args: Array<String>) {
 
     runner(args.drop(1))
 }
-

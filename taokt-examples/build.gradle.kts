@@ -33,3 +33,43 @@ java {
         languageVersion.set(JavaLanguageVersion.of(17))
     }
 }
+
+// jpackage configuration for macOS .app bundle with modern UI support
+if (OperatingSystem.current().isMacOsX) {
+    tasks.register<Exec>("jpackageApp") {
+        dependsOn("installDist")
+
+        val appName = "TaoKtExamples"
+        val outputDir = layout.buildDirectory.dir("jpackage").get().asFile
+        val inputDir = layout.buildDirectory.dir("install/taokt-examples/lib").get().asFile
+        val resourceDir = file("src/main/resources/macos")
+        val mainJar = "taokt-examples-${version}.jar"
+
+        doFirst {
+            outputDir.mkdirs()
+        }
+
+        commandLine(
+            "jpackage",
+            "--type", "app-image",
+            "--name", appName,
+            "--input", inputDir.absolutePath,
+            "--main-jar", mainJar,
+            "--main-class", "io.github.kdroidfilter.taokt.examples.MainKt",
+            "--dest", outputDir.absolutePath,
+            "--java-options", "-XstartOnFirstThread",
+            "--mac-package-identifier", "io.github.kdroidfilter.taokt.examples",
+            "--mac-package-name", "TaoKt Examples",
+            "--resource-dir", resourceDir.absolutePath,
+            "--verbose"
+        )
+    }
+
+    tasks.register<Exec>("runApp") {
+        dependsOn("jpackageApp")
+
+        val appPath = layout.buildDirectory.file("jpackage/TaoKtExamples.app/Contents/MacOS/TaoKtExamples").get().asFile
+
+        commandLine(appPath.absolutePath, *project.findProperty("appArgs")?.toString()?.split(" ")?.toTypedArray() ?: arrayOf("window"))
+    }
+}
