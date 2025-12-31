@@ -181,4 +181,4 @@ You can also run the built-in `window` example with `./gradlew :taokt-examples:r
 
 ## License
 
-TaoKt is distributed under the Apache License 2.0. See `third_party/tao/LICENSE` for upstream Tao licensing details.
+TaoKt is distributed under the Apache License 2.0.
