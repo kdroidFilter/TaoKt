@@ -189,6 +189,7 @@ object Examples {
                             videoModeId = when (key) {
                                 Key.ArrowLeft -> (videoModeId - 1).coerceAtLeast(0)
                                 Key.ArrowRight -> (videoModeId + 1).coerceAtMost(videoModes.lastIndex)
+                                else -> return
                             }
                             println("Picking video mode: ${videoModes[videoModeId].displayString()}")
                         }
@@ -937,6 +938,7 @@ object Examples {
                                             we.event.state == ElementState.RELEASED && we.event.logicalKey == Key.Escape
                                         }
 
+                                        else -> false
                                     }
 
                                     if (shouldClose) {

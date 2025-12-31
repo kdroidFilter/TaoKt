@@ -48,7 +48,7 @@ This repo contains Kotlin/JVM bindings for `tauri-apps/tao` using Gobley (UniFFI
 ### Run examples
 
 ```shell
-./gradlew :taokt-examples:run --args="<example>"
+./gradlew :taokt-examples:run --args="theme"
 ```
 
 ### Run examples (Kotlin/Native)
