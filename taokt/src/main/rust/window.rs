@@ -175,6 +175,220 @@ impl Window {
         self.id
     }
 
+    pub fn ns_view_handle(&self) -> Result<u64, TaoError> {
+        #[cfg(target_os = "macos")]
+        {
+            use tao::platform::macos::WindowExtMacOS;
+            let window = self.inner.lock().unwrap();
+            return Ok(window.ns_view() as u64);
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            return Err(TaoError::Unsupported);
+        }
+    }
+
+    pub fn ns_window_handle(&self) -> Result<u64, TaoError> {
+        #[cfg(target_os = "macos")]
+        {
+            use tao::platform::macos::WindowExtMacOS;
+            let window = self.inner.lock().unwrap();
+            return Ok(window.ns_window() as u64);
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            return Err(TaoError::Unsupported);
+        }
+    }
+
+    /// Returns the HWND handle (Windows only).
+    pub fn hwnd_handle(&self) -> Result<u64, TaoError> {
+        #[cfg(target_os = "windows")]
+        {
+            use tao::platform::windows::WindowExtWindows;
+            let window = self.inner.lock().unwrap();
+            return Ok(window.hwnd() as u64);
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            return Err(TaoError::Unsupported);
+        }
+    }
+
+    /// Returns the HINSTANCE handle (Windows only).
+    pub fn hinstance_handle(&self) -> Result<u64, TaoError> {
+        #[cfg(target_os = "windows")]
+        {
+            use tao::platform::windows::WindowExtWindows;
+            let window = self.inner.lock().unwrap();
+            return Ok(window.hinstance() as u64);
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            return Err(TaoError::Unsupported);
+        }
+    }
+
+    /// Returns the X11 window ID (Linux X11 only).
+    pub fn xlib_window_handle(&self) -> Result<u64, TaoError> {
+        #[cfg(any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        ))]
+        {
+            use tao::platform::unix::WindowExtUnix;
+            let window = self.inner.lock().unwrap();
+            if let Some(xlib_window) = window.xlib_window() {
+                return Ok(xlib_window as u64);
+            }
+            return Err(TaoError::Unsupported);
+        }
+        #[cfg(not(any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        )))]
+        {
+            return Err(TaoError::Unsupported);
+        }
+    }
+
+    /// Returns the X11 display pointer (Linux X11 only).
+    pub fn xlib_display_handle(&self) -> Result<u64, TaoError> {
+        #[cfg(any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        ))]
+        {
+            use tao::platform::unix::WindowExtUnix;
+            let window = self.inner.lock().unwrap();
+            if let Some(xlib_display) = window.xlib_display() {
+                return Ok(xlib_display as u64);
+            }
+            return Err(TaoError::Unsupported);
+        }
+        #[cfg(not(any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        )))]
+        {
+            return Err(TaoError::Unsupported);
+        }
+    }
+
+    /// Returns the X11 screen ID (Linux X11 only).
+    pub fn xlib_screen_id(&self) -> Result<i32, TaoError> {
+        #[cfg(any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        ))]
+        {
+            use tao::platform::unix::WindowExtUnix;
+            let window = self.inner.lock().unwrap();
+            if let Some(screen_id) = window.xlib_screen_id() {
+                return Ok(screen_id);
+            }
+            return Err(TaoError::Unsupported);
+        }
+        #[cfg(not(any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        )))]
+        {
+            return Err(TaoError::Unsupported);
+        }
+    }
+
+    /// Returns the Wayland surface pointer (Linux Wayland only).
+    pub fn wayland_surface_handle(&self) -> Result<u64, TaoError> {
+        #[cfg(any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        ))]
+        {
+            use tao::platform::unix::WindowExtUnix;
+            let window = self.inner.lock().unwrap();
+            if let Some(wayland_surface) = window.wayland_surface() {
+                return Ok(wayland_surface as u64);
+            }
+            return Err(TaoError::Unsupported);
+        }
+        #[cfg(not(any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        )))]
+        {
+            return Err(TaoError::Unsupported);
+        }
+    }
+
+    /// Returns the Wayland display pointer (Linux Wayland only).
+    pub fn wayland_display_handle(&self) -> Result<u64, TaoError> {
+        #[cfg(any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        ))]
+        {
+            use tao::platform::unix::WindowExtUnix;
+            let window = self.inner.lock().unwrap();
+            if let Some(wayland_display) = window.wayland_display() {
+                return Ok(wayland_display as u64);
+            }
+            return Err(TaoError::Unsupported);
+        }
+        #[cfg(not(any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        )))]
+        {
+            return Err(TaoError::Unsupported);
+        }
+    }
+
+    /// Returns the raw window handle for graphics operations.
+    pub fn raw_window_handle(&self) -> Result<crate::RawWindowHandle, TaoError> {
+        use crate::graphics::WindowGraphicsExt;
+        WindowGraphicsExt::raw_window_handle(self)
+    }
+
+    /// Returns the raw window handle for a specific graphics backend.
+    pub fn raw_window_handle_for_backend(
+        &self,
+        backend: crate::GraphicsBackend,
+    ) -> Result<crate::RawWindowHandle, TaoError> {
+        use crate::graphics::WindowGraphicsExt;
+        WindowGraphicsExt::raw_window_handle_for_backend(self, backend)
+    }
+
     pub fn request_redraw(&self) {
         let window = self.inner.lock().unwrap();
         window.request_redraw();
@@ -183,6 +397,11 @@ impl Window {
     pub fn set_title(&self, title: String) {
         let window = self.inner.lock().unwrap();
         window.set_title(&title);
+    }
+
+    pub fn scale_factor(&self) -> f64 {
+        let window = self.inner.lock().unwrap();
+        window.scale_factor()
     }
 
     pub fn set_cursor_icon(&self, icon: CursorIcon) {

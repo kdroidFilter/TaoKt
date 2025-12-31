@@ -1,8 +1,37 @@
-This is a Kotlin Multiplatform project targeting Desktop (JVM).
+# TaoKt - Kotlin Bindings for Tao Windowing Library
 
-## TaoKt (tao → Kotlin/JVM)
+TaoKt provides Kotlin Multiplatform bindings for [Tao](https://github.com/tauri-apps/tao), the cross-platform windowing library from the Tauri project.
 
-This repo also contains a Kotlin/JVM binding for `tauri-apps/tao` using Gobley (UniFFI + JNA), plus Kotlin ports of all upstream `tao` examples (`third_party/tao/examples`).
+## Overview
+
+TaoKt enables Kotlin applications to create native windows and handle events without relying on AWT/Swing. It supports both Kotlin/JVM and Kotlin/Native targets.
+
+### Features
+
+- **Cross-platform windowing**: Create native windows on macOS, Linux, and Windows
+- **Event handling**: Full event loop with keyboard, mouse, and window events
+- **DPI awareness**: Proper handling of high-DPI displays
+- **Modern graphics**: Support for Metal, Vulkan, DirectX 12, and OpenGL backends
+- **Kotlin Multiplatform**: Works on both JVM and Native targets
+
+### Supported Platforms
+
+| Platform | Graphics Backend | Status |
+|----------|-----------------|--------|
+| macOS | Metal | ✅ Stable |
+| macOS | OpenGL | ✅ Stable |
+| Linux (X11) | Vulkan | ✅ Stable |
+| Linux (X11) | OpenGL | ✅ Stable |
+| Linux (Wayland) | Vulkan | 🚧 Experimental |
+| Windows | DirectX 12 | ✅ Stable |
+| Windows | Vulkan | ✅ Stable |
+| Windows | OpenGL | ✅ Stable |
+
+---
+
+## TaoKt Modules
+
+This repo contains Kotlin/JVM bindings for `tauri-apps/tao` using Gobley (UniFFI + JNA), plus Kotlin ports of all upstream `tao` examples (`third_party/tao/examples`).
 
 ### Modules
 
@@ -70,3 +99,141 @@ in your IDE’s toolbar or run it directly from the terminal:
 ---
 
 Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html)…
+
+---
+
+## Integration with Skiko
+
+TaoKt integrates seamlessly with Skiko for hardware-accelerated 2D graphics rendering.
+
+### Example: Creating a Skiko Window
+
+```kotlin
+import io.github.kdroidfilter.taokt.tao.*
+import org.jetbrains.skiko.*
+import org.jetbrains.skia.*
+
+fun main() {
+    val layer = SkiaLayer()
+    layer.renderDelegate = object : SkikoRenderDelegate {
+        override fun onRender(canvas: Canvas, width: Int, height: Int, nanoTime: Long) {
+            canvas.clear(Color.WHITE)
+            // Draw with Skia APIs
+            val paint = Paint().apply {
+                color = Color.BLUE
+                isAntiAlias = true
+            }
+            canvas.drawCircle(width / 2f, height / 2f, 100f, paint)
+        }
+    }
+
+    run(object : TaoEventHandler {
+        private var window: Window? = null
+
+        override fun handleEvent(event: TaoEvent, app: App): ControlFlow {
+            when (event) {
+                is TaoEvent.NewEvents -> {
+                    if (event.cause == TaoStartCause.Init) {
+                        window = app.createWindow(WindowBuilder().apply {
+                            setTitle("Skiko + Tao")
+                            setInnerSize(LogicalSize(800.0, 600.0))
+                        })
+                        layer.attachTo(window!!)
+                    }
+                }
+                is TaoEvent.RedrawRequested -> {
+                    layer.needRender()
+                }
+                is TaoEvent.MainEventsCleared -> {
+                    window?.requestRedraw()
+                }
+                is TaoEvent.WindowEvent -> {
+                    when (event.event) {
+                        TaoWindowEvent.CloseRequested -> {
+                            layer.detach()
+                            return ControlFlow.Exit
+                        }
+                        else -> {}
+                    }
+                }
+                else -> {}
+            }
+            return ControlFlow.Wait
+        }
+    })
+}
+```
+
+### Running the Skiko Sample
+
+```bash
+# From the skiko directory
+./gradlew :skiko:runTaoClock -Pskiko.tao.enabled=true
+```
+
+---
+
+## API Overview
+
+### Core Types
+
+| Type | Description |
+|------|-------------|
+| `App` | Application context with event loop proxy |
+| `Window` | Native window handle |
+| `WindowBuilder` | Builder pattern for window configuration |
+| `TaoEvent` | Event types (window, keyboard, mouse, etc.) |
+| `ControlFlow` | Event loop control (Wait, Poll, Exit) |
+
+### Graphics Types
+
+| Type | Description |
+|------|-------------|
+| `RawWindowHandle` | Platform-specific window handles for graphics |
+| `GraphicsBackend` | Supported backends (Metal, Vulkan, DirectX12, OpenGL) |
+
+### Event Types
+
+| Type | Description |
+|------|-------------|
+| `TaoWindowEvent` | Window events (resize, close, focus, etc.) |
+| `TaoDeviceEvent` | Raw input events |
+| `KeyEvent` | Keyboard input with key codes and modifiers |
+| `MouseButton` | Mouse button identifiers |
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────┐
+│  Kotlin Application                 │
+│  (Skiko + TaoKt)                    │
+└─────────────────────────────────────┘
+              ↓ UniFFI / JNA
+┌─────────────────────────────────────┐
+│  TaoKt Rust Bindings                │
+│  - Window management                │
+│  - Event handling                   │
+│  - Graphics abstractions            │
+└─────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────┐
+│  Tao (Rust)                         │
+│  - Native windowing                 │
+│  - OS integration                   │
+└─────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────┐
+│  Platform APIs                      │
+│  - AppKit (macOS)                   │
+│  - Win32 (Windows)                  │
+│  - GTK/X11/Wayland (Linux)          │
+└─────────────────────────────────────┘
+```
+
+---
+
+## License
+
+This project is part of Skiko and follows the same license terms.
