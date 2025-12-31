@@ -73,103 +73,49 @@ Notes:
 - On Linux (Kotlin/Native), you need GTK3 dev libraries (for example on Debian/Ubuntu: `sudo apt-get install libgtk-3-dev`).
 - Kotlin/Native on Windows supports x64 only (`mingwX64`).
 
-* [/composeApp](./composeApp/src) is for code that will be shared across your Compose Multiplatform applications.
-  It contains several subfolders:
-    - [commonMain](./composeApp/src/commonMain/kotlin) is for code that’s common for all targets.
-    - Other folders are for Kotlin code that will be compiled for only the platform indicated in the folder name.
-      For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-      the [iosMain](./composeApp/src/iosMain/kotlin) folder would be the right place for such calls.
-      Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./composeApp/src/jvmMain/kotlin)
-      folder is the appropriate location.
-
-### Build and Run Desktop (JVM) Application
-
-To build and run the development version of the desktop app, use the run configuration from the run widget
-in your IDE’s toolbar or run it directly from the terminal:
-
-- on macOS/Linux
-  ```shell
-  ./gradlew :composeApp:run
-  ```
-- on Windows
-  ```shell
-  .\gradlew.bat :composeApp:run
-  ```
-
 ---
 
-Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html)…
+## Quick Start
 
----
-
-## Integration with Skiko
-
-TaoKt integrates seamlessly with Skiko for hardware-accelerated 2D graphics rendering.
-
-### Example: Creating a Skiko Window
+A minimal TaoKt application that opens a native window:
 
 ```kotlin
 import io.github.kdroidfilter.taokt.tao.*
-import org.jetbrains.skiko.*
-import org.jetbrains.skia.*
+import io.github.kdroidfilter.taokt.tao.run as taoRun
 
 fun main() {
-    val layer = SkiaLayer()
-    layer.renderDelegate = object : SkikoRenderDelegate {
-        override fun onRender(canvas: Canvas, width: Int, height: Int, nanoTime: Long) {
-            canvas.clear(Color.WHITE)
-            // Draw with Skia APIs
-            val paint = Paint().apply {
-                color = Color.BLUE
-                isAntiAlias = true
-            }
-            canvas.drawCircle(width / 2f, height / 2f, 100f, paint)
-        }
-    }
+    taoRun(
+        object : TaoEventHandler {
+            private var window: Window? = null
 
-    run(object : TaoEventHandler {
-        private var window: Window? = null
-
-        override fun handleEvent(event: TaoEvent, app: App): ControlFlow {
-            when (event) {
-                is TaoEvent.NewEvents -> {
-                    if (event.cause == TaoStartCause.Init) {
-                        window = app.createWindow(WindowBuilder().apply {
-                            setTitle("Skiko + Tao")
-                            setInnerSize(LogicalSize(800.0, 600.0))
-                        })
-                        layer.attachTo(window!!)
+            override fun handleEvent(event: TaoEvent, app: App): ControlFlow {
+                when (event) {
+                    is TaoEvent.NewEvents -> if (event.cause == TaoStartCause.Init) {
+                        window = app.createWindow(
+                            WindowBuilder().apply {
+                                setTitle("Hello TaoKt")
+                                setInnerSize(LogicalSize(300.0, 300.0))
+                            },
+                        )
                     }
-                }
-                is TaoEvent.RedrawRequested -> {
-                    layer.needRender()
-                }
-                is TaoEvent.MainEventsCleared -> {
-                    window?.requestRedraw()
-                }
-                is TaoEvent.WindowEvent -> {
-                    when (event.event) {
-                        TaoWindowEvent.CloseRequested -> {
-                            layer.detach()
-                            return ControlFlow.Exit
-                        }
+
+                    is TaoEvent.WindowEvent -> when (event.event) {
+                        TaoWindowEvent.CloseRequested -> window?.close()
+                        TaoWindowEvent.Destroyed -> return ControlFlow.Exit
                         else -> {}
                     }
+
+                    TaoEvent.MainEventsCleared -> window?.requestRedraw()
+                    else -> {}
                 }
-                else -> {}
+                return ControlFlow.Wait
             }
-            return ControlFlow.Wait
-        }
-    })
+        },
+    )
 }
 ```
 
-### Running the Skiko Sample
-
-```bash
-# From the skiko directory
-./gradlew :skiko:runTaoClock -Pskiko.tao.enabled=true
-```
+You can also run the built-in `window` example with `./gradlew :taokt-examples:run --args="window"`.
 
 ---
 
@@ -207,8 +153,7 @@ fun main() {
 
 ```
 ┌─────────────────────────────────────┐
-│  Kotlin Application                 │
-│  (Skiko + TaoKt)                    │
+│  Kotlin application using TaoKt     │
 └─────────────────────────────────────┘
               ↓ UniFFI / JNA
 ┌─────────────────────────────────────┐
@@ -236,4 +181,4 @@ fun main() {
 
 ## License
 
-This project is part of Skiko and follows the same license terms.
+TaoKt is distributed under the Apache License 2.0. See `third_party/tao/LICENSE` for upstream Tao licensing details.

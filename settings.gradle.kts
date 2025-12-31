@@ -33,7 +33,6 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
-include(":composeApp")
 include(":taokt-bindings")
 include(":taokt-examples")
 include(":taokt-examples-native")
